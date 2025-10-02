@@ -1,13 +1,80 @@
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { blogPosts } from "@/data/blogPosts";
+import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
 import ReactMarkdown from "react-markdown";
+import { Loader2 } from "lucide-react";
+
+interface Post {
+  id: string;
+  title: string;
+  excerpt: string;
+  content: string;
+  category: string;
+  read_time: string;
+  image_url: string | null;
+  created_at: string;
+  author_id: string;
+  profiles: {
+    display_name: string | null;
+    username: string;
+  };
+}
 
 const BlogPost = () => {
   const { id } = useParams();
-  const post = blogPosts.find(p => p.id === id);
+  const [post, setPost] = useState<Post | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchPost();
+  }, [id]);
+
+  const fetchPost = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("posts")
+        .select(`
+          *,
+          profiles (
+            display_name,
+            username
+          )
+        `)
+        .eq("id", id)
+        .eq("published", true)
+        .single();
+
+      if (error) throw error;
+      setPost(data);
+    } catch (error) {
+      console.error("Error fetching post:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  if (loading) {
+    return (
+      <>
+        <Header />
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </>
+    );
+  }
 
   if (!post) {
     return (
@@ -45,7 +112,7 @@ const BlogPost = () => {
               </span>
               <span className="text-sm text-muted-foreground flex items-center gap-1">
                 <Clock className="h-3 w-3" />
-                {post.readTime}
+                {post.read_time}
               </span>
             </div>
             
@@ -53,13 +120,17 @@ const BlogPost = () => {
               {post.title}
             </h1>
             
-            <time className="text-muted-foreground">{post.date}</time>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span>By {post.profiles.display_name || post.profiles.username}</span>
+              <span>•</span>
+              <time>{formatDate(post.created_at)}</time>
+            </div>
           </div>
 
-          {post.image && (
+          {post.image_url && (
             <div className="mb-12 rounded-lg overflow-hidden">
               <img 
-                src={post.image} 
+                src={post.image_url} 
                 alt={post.title}
                 className="w-full h-auto"
               />

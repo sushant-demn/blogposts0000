@@ -1,9 +1,54 @@
+import { useEffect, useState } from "react";
 import BlogCard from "@/components/BlogCard";
 import Header from "@/components/Header";
-import { blogPosts } from "@/data/blogPosts";
+import { supabase } from "@/integrations/supabase/client";
 import heroImage from "@/assets/hero-blog.jpg";
+import { Loader2 } from "lucide-react";
+
+interface Post {
+  id: string;
+  title: string;
+  excerpt: string;
+  category: string;
+  read_time: string;
+  image_url: string | null;
+  created_at: string;
+}
 
 const Index = () => {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const fetchPosts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("posts")
+        .select("*")
+        .eq("published", true)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setPosts(data || []);
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
   return (
     <div className="min-h-screen">
       <Header />
@@ -40,20 +85,32 @@ const Index = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {blogPosts.map((post) => (
-              <BlogCard
-                key={post.id}
-                id={post.id}
-                title={post.title}
-                excerpt={post.excerpt}
-                date={post.date}
-                readTime={post.readTime}
-                category={post.category}
-                image={post.image}
-              />
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground text-lg">
+                No posts yet. Check back soon!
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {posts.map((post) => (
+                <BlogCard
+                  key={post.id}
+                  id={post.id}
+                  title={post.title}
+                  excerpt={post.excerpt}
+                  date={formatDate(post.created_at)}
+                  readTime={post.read_time}
+                  category={post.category}
+                  image={post.image_url || undefined}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
